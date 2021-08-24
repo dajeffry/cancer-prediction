@@ -1,0 +1,450 @@
+---
+title: "prediction of Breast Cancer Diagnosis"
+author: "Daniel Jeffry"
+date: "2/20/2021"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Description
+
+This report describe prediction of breast cancer diagnosis using Machine Learning Algorithm. we investigated 4 Algorithm : Logistic Regression, Decision tree, Random Foresst, and support Vector Machine (SVM)
+The dataset used in this report is Breast Cancer Wisconsin hosted in kaggle.
+
+The dataset can be dowloaded
+
+[here.] (https://www.kaggle.com/uciml/breast-cancer-wisconsin-data)
+
+**Report Outline** :  
+1. Data Extraction  
+2. Exploratory Data Analysis  
+3. Data Processing  
+4. Modelling  
+5. Evaluation   
+6. Compare with PCA  
+7. Recommendation  
+
+## 1. Data Extraction
+
+The Dataset is downlaoded from kaggle and saved in the data folder. we used read.csv function to read the dataset and put in bcw_df data frame
+
+
+```{r}
+bcw_df <- read.csv("Data/data.csv")
+```
+
+To see the number of rows and column, we used dim fuction. The dataset has 569 rows and 33 columns
+
+```{r}
+dim(bcw_df)
+```
+
+
+## 2. Exploratory Data Analysis
+
+To find out the column names and types, we used **str() function
+```{r}
+str(bcw_df)
+```
+
+From the result above, weknow the following:
+1. The first column is *id*. it is unique and unnecassary for prediction. so, it should be removed.
+2. The second column is **diagnosis**. this should be a class variable, Currently the type is **char** and it should be converted to **factor**
+3. The last column is **x**. All the values are NA. So, it should be removed.
+
+```{r}
+bcw_df$id <- NULL
+bcw_df$X <- NULL
+
+# change to factor for target variabel
+bcw_df$diagnosis <- as.factor(bcw_df$diagnosis)
+```
+
+### 2.1 Univariate Data Analysis
+Analysis satu variable.
+contoh: boxplot, histogram, piechart
+
+```{r}
+library(ggplot2)
+
+ggplot(data=bcw_df, aes(x = diagnosis)) +
+  geom_bar()
+```
+Distribution of **Radius Mean** variable in boxplot
+
+```{r}
+ggplot(data = bcw_df, aes(y=radius_mean)) +
+  geom_boxplot() +
+  labs(title = "Breast Cancer Wisconsin Data", y="Radius Mean")
+```
+Distribution of **Radius Mean** variable in histogram
+```{r}
+ggplot(data = bcw_df, aes(x=radius_mean)) + geom_histogram()
+```
+```{r}
+library(gridExtra)
+p1 <- ggplot(data = bcw_df, aes(x=diagnosis)) + geom_bar()
+p2 <- ggplot(data = bcw_df, aes(y=radius_mean)) +
+  geom_boxplot()
+p3 <- ggplot(data = bcw_df, aes(x=radius_mean)) + geom_histogram()
+
+grid.arrange(p1,p2,p3, nrow = 2, ncol = 3)
+```
+
+
+### 2.2 Bivariate Data Analysis
+Analysis of two variables, Distribution of **radius mean** variable based on diagnosis.
+
+```{r}
+ggplot(data=bcw_df, aes(x=diagnosis, y=radius_mean)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.3,
+              color = "blue",
+              width = 0.2) +
+  labs(title = "Breast Cancer Wisconsin Data", y="Radius Mean")
+
+ggplot(data = bcw_df, aes(x=radius_mean, fill = diagnosis)) + geom_density(alpha = .3)
+```
+
+Observations based on **radius mean** and **texture** mean variables. Each point is a single observation. the color and shape of the observations are based on diagnosis (benign and malignant)
+```{r}
+ggplot(data=bcw_df, aes(x=radius_mean, y=texture_mean,
+                        shape=diagnosis, color=diagnosis)) +
+  geom_point() +
+  labs(title = "Breast Cancer Wisconsin Data", x="Radius Mean", y="Texture Mean")
+```
+In general, **benign** has lower radius mean and texture mean than **malignant**. However, these two variables are not enough two separate the classes
+
+
+### 2.3 Multivariate Data Analysis
+
+There are three types of measurements: mean, standard error (se), and worst (mean of the three largest values). Each measurement has 10 variables so the total is 30 variables. We want to compute and visualize correlation coefficient of each measurement.
+
+Visualize person's Correlation Coefficient for *mean variables
+```{r}
+# install.packages("corrgram")
+library(corrgram)
+
+corrgram(bcw_df[2:11], order = TRUE,
+         upper.panel = panel.pie)
+```
+
+Visualize person's Correlation Coefficient for *se variables
+```{r}
+corrgram(bcw_df[12:21], order = TRUE,
+         upper.panel = panel.pie)
+```
+
+Visualize person's Correlation Coefficient for *worst variables
+```{r}
+corrgram(bcw_df[22:31], order = TRUE,
+         upper.panel = panel.pie)
+```
+
+We can also see area, radius, and perimeter are co-linear. So, we need to remove two of them:
+
+We can also see compactness,  concavity, and concave.points are co-linear. So, we need to remove two of them: compactness and concave.points.
+
+## 3. Data Processing
+
+### 3.1 Feature Selection
+
+Remove *_worst variables, based on discission with domain expert, the alll variables with ending worst should be removed.
+
+
+```{r}
+bcw_df2 <- bcw_df[1:21]
+```
+
+
+Remove area, perimeter, compactness, concavity
+
+```{r}
+bcw_df2$area_mean <- NULL
+bcw_df2$perimeter_mean <- NULL
+bcw_df2$compactness_mean <- NULL
+bcw_df2$concavity_mean <- NULL
+
+bcw_df2$area_se <- NULL
+bcw_df2$perimeter_se <- NULL
+bcw_df2$compactness_se <- NULL
+bcw_df2$concavity_se <- NULL
+
+dim(bcw_df2)
+```
+
+
+### 3.2 Remove Outlier
+
+### 3.3 Feature Scaling
+
+### 3.4 PCA
+
+```{r}
+pr.out <- prcomp(bcw_df[2:31], scale. = TRUE)
+pr.out$x
+```
+
+We can find the cumulative value for each Principle Componenet
+
+```{r}
+pve = 100 * (pr.out$sdev^2) / sum(pr.out$sdev^2)
+par(mfrow=c(1,2))
+plot(pve,
+     xlab = "Principal Component",
+     ylab = "PVE",
+     type = "o", col = "blue")
+
+plot(cumsum(pve),
+     xlab = "Principal Component",
+     ylab = "Cumulative PVE",
+     type = "o", col = "red")
+```
+
+Based on the data, the cumulative value of pve in the 11th data does not have a significant increase, therefore we can take up to the 10th pc data.
+
+```{r}
+x <- pr.out$x
+new_features <- data.frame(pr.out$x)
+new_features <- new_features[1:10]
+
+PCA_bcw_df <- new_features
+PCA_bcw_df$diagnosis <- bcw_df$diagnosis
+```
+
+Divide into train and test
+
+```{r}
+set.seed(2021)
+m = nrow(bcw_df)
+train_ind_PCA <- sample(m, 0.7 * m)
+train_df_PCA <- bcw_df[train_ind_PCA, ]
+test_df_PCA <- bcw_df[-train_ind_PCA, ]
+
+train_ind_PCA
+```
+
+### 3.5 Training and Test Division
+
+Use **set.seed()** for reproducible result. Ratio train:test = 70:30.
+
+```{r}
+set.seed(2021)
+m = nrow(bcw_df)
+train_ind <- sample(m, 0.7 * m)
+train_df <- bcw_df2[train_ind, ]
+test_df <- bcw_df2[-train_ind, ]
+```
+
+Divide train and test data into PCA
+
+```{r}
+PCA_train_df <- PCA_bcw_df[train_ind, ]
+PCA_test_df <- PCA_bcw_df[-train_ind, ]
+```
+
+## 4. Modelling
+
+we use 4 Machine Learning algorithms.
+
+### 4.1 Modelling without PCA
+
+#### 4.1.1 Logistic Regression
+```{r}
+fit.logit <- glm(diagnosis~. ,
+                 data = train_df,
+                 family = binomial)
+summary(fit.logit)
+```
+
+
+#### 4.1.2 Decision Tree
+
+```{r, massage=FALSE}
+library(party)
+fit.ctree <- ctree(diagnosis~. , data = train_df)
+plot(fit.ctree, main = "Conditional Inference Tree")
+```
+
+#### 4.1.3 Random Forest
+
+```{r, massage=FALSE}
+library(randomForest)
+
+set.seed(2021)
+fit.forest <- randomForest(formula = diagnosis ~ ., data = train_df,
+                           na.action = na.roughfix,
+                           importance = TRUE)
+fit.forest
+```
+
+#### 4.1.4 Support Vector Machine (SVM)
+
+```{r, massage=FALSE}
+library(e1071)
+set.seed(2021)
+fit.svm <- svm(diagnosis~., data=train_df)
+fit.svm
+```
+
+### 4.2 Modelling with PCA
+
+#### 4.2.1 Logistic Regression
+
+```{r}
+PCA_fit.logit <- glm(diagnosis~., 
+                 data = PCA_train_df, 
+                 family = binomial)
+
+summary(PCA_fit.logit)
+```
+
+#### 4.2.2 Decision Tree  
+
+```{r}
+library(party)
+PCA_fit.ctree <- ctree(diagnosis~. , data = PCA_train_df)
+plot(PCA_fit.ctree, main = "Conditional Inference Tree (PCA)")
+```
+
+#### 4.2.3 Random FOrest
+
+```{r}
+set.seed(2021)
+PCA_fit.forest <- randomForest(formula = diagnosis ~ ., data = PCA_train_df,
+                           na.action = na.roughfix,
+                           importance = TRUE)
+PCA_fit.forest
+```
+
+#### 4.2.4 Support Vector Machine
+
+```{r}
+set.seed(2021)
+PCA_fit.svm <- svm(diagnosis~., data=PCA_train_df)
+PCA_fit.svm
+```
+
+## 5. Evaluation  
+
+### 5.1 Evaluation without PCA  
+
+We compute accuracy, precision, recall, and F1 score.  
+
+```{r}
+performance <- function(table, n=2){
+  tp = table[2,2]
+  tn = table[1,1]
+  fp = table[1,2]
+  fn = table[2,1]
+  
+  sensitivity = tp/(tp+fn) # recall
+  specificity = tn/(tn+fp)
+  ppp = tp/(tp+fp) # precision
+  npp = tn/(tn+fn)
+  hitrate = (tp+tn)/(tp+tn+fp+fn) # accuracy
+  
+  result <- paste("Sensitivity = ", round(sensitivity, n),
+                  "\nSpecificity = ", round(specificity, n),
+                  "\nPositive Predictive Value = ", round(ppp,n), "\nNegative Predictive Value = ",round(npp, n),
+                  "nAccuracy = ", round(hitrate, n))
+  cat(result)
+}
+```
+
+```{r}
+prob <- predict(fit.logit, test_df, type = "response")
+logit.pred <- factor(prob > 0.5, levels = c(FALSE, TRUE),
+                     labels = c("benign", "malignant"))
+
+logit.perf <- table(test_df$diagnosis, logit.pred,
+                    dnn = c("Actual", "predicted"))
+logit.perf
+
+performance(logit.perf)
+```
+```{r}
+fit.ctree <- ctree(formula = diagnosis ~ . , data = train_df)
+
+ctree.pred <- predict(fit.ctree, test_df, type = "response")
+ctree.perf <- table(test_df$diagnosis, ctree.pred,
+                    dnn = c("Actual", "predicted"))
+
+ctree.perf
+
+performance(ctree.perf)
+```
+```{r}
+forest.pred <- predict(fit.forest, test_df, type = "response")
+forest.perf <- table(test_df$diagnosis, forest.pred,
+                    dnn=c("Actual","Predicted"))
+forest.perf
+
+performance (forest.perf)
+
+```
+```{r}
+svm.pred <- predict(fit.svm, test_df, type = "response")
+svm.perf <- table(test_df$diagnosis, svm.pred,
+                  dnn = c("Actual", "Predicted"))
+svm.perf
+
+performance(svm.perf)
+```
+
+### 5.2 Evaluation with PCA  
+
+We compute accuracy, precision, recall, and F1 score. 
+
+```{r}
+PCA_prob <- predict(PCA_fit.logit, PCA_test_df, type = "response")
+PCA_logit.pred <- factor(PCA_prob > 0.5, levels = c(FALSE, TRUE),
+                     labels = c("benign", "malignant"))
+
+PCA_logit.perf <- table(PCA_test_df$diagnosis, PCA_logit.pred,
+                    dnn = c("Actual", "predicted"))
+PCA_logit.perf
+
+performance(PCA_logit.perf)
+```
+```{r}
+PCA_fit.ctree <- ctree(formula = diagnosis ~ . , data = PCA_train_df)
+
+PCA_ctree.pred <- predict(PCA_fit.ctree, PCA_test_df, type = "response")
+PCA_ctree.perf <- table(PCA_test_df$diagnosis, PCA_ctree.pred,
+                    dnn = c("Actual", "predicted"))
+
+PCA_ctree.perf
+
+performance(PCA_ctree.perf)
+```
+```{r}
+PCA_forest.pred <- predict(PCA_fit.forest, PCA_test_df, type = "response")
+PCA_forest.perf <- table(PCA_test_df$diagnosis, PCA_forest.pred,
+                    dnn=c("Actual","Predicted"))
+PCA_forest.perf
+
+performance (PCA_forest.perf)
+```
+```{r}
+PCA_svm.pred <- predict(PCA_fit.svm, PCA_test_df, type = "response")
+PCA_svm.perf <- table(PCA_test_df$diagnosis, PCA_svm.pred,
+                  dnn = c("Actual", "Predicted"))
+PCA_svm.perf
+
+performance(PCA_svm.perf)
+```
+
+
+## 6. Recommendation
+
+1. Random forest algorithm is the best among all the tested  algorithms.
+2. Based on decision tree model, the most important variable are concave.point, radius_mean, and texture_mean.
+3. The result can be improved by better data preparation using
+other algorithms. However, the current result surpass human level performance (79% accuracy). So, it can be deployed as second opinion for the doctor.
+
